@@ -84,8 +84,17 @@ public class RemoteFile implements Parcelable, Serializable {
     public RemoteFile(String path) {
         resetData();
 
-        if (path == null || path.length() == 0) {
-            path = "/";
+        if (path != null) {
+            if (path.length() == 0) {
+                path = "/";
+            } else if (path.length() > 1) {
+                if (path.endsWith("/")) {
+                    path = path.substring(0, path.length()-1);
+                }
+                if (!path.startsWith("/")) {
+                    path = "/" + path;
+                }
+            }
         }
 
         if (path == null || path.length() <= 0 || !path.startsWith(FileUtils.PATH_SEPARATOR)) {
