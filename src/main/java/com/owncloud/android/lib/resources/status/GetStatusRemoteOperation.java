@@ -1,22 +1,22 @@
 /* ownCloud Android Library is available under MIT license
  *   Copyright (C) 2015 ownCloud Inc.
- *   
+ *
  *   Permission is hereby granted, free of charge, to any person obtaining a copy
  *   of this software and associated documentation files (the "Software"), to deal
  *   in the Software without restriction, including without limitation the rights
  *   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  *   copies of the Software, and to permit persons to whom the Software is
  *   furnished to do so, subject to the following conditions:
- *   
+ *
  *   The above copyright notice and this permission notice shall be included in
  *   all copies or substantial portions of the Software.
- *   
- *   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, 
+ *
+ *   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
  *   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- *   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND 
- *   NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS 
- *   BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN 
- *   ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN 
+ *   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ *   NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ *   BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ *   ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
  *   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  *   THE SOFTWARE.
  *
@@ -46,19 +46,19 @@ import java.util.ArrayList;
 
 /**
  * Checks if the server is valid and if the server supports the Share API
- * 
+ *
  * @author David A. Velasco
  * @author masensio
  */
 public class GetStatusRemoteOperation extends RemoteOperation {
-    
-    /** 
+
+    /**
      * Maximum time to wait for a response from the server when the connection is being tested, in MILLISECONDs.
      */
     private static final int TRY_CONNECTION_TIMEOUT = 50000;
 
     private static final String TAG = GetStatusRemoteOperation.class.getSimpleName();
-    
+
     private static final String NODE_INSTALLED = "installed";
     private static final String NODE_VERSION = "version";
     private static final String NODE_EXTENDED_SUPPORT = "extendedSupport";
@@ -72,11 +72,12 @@ public class GetStatusRemoteOperation extends RemoteOperation {
     public GetStatusRemoteOperation(Context context) {
         mContext = context;
     }
-    
+
     private boolean tryConnection(OwnCloudClient client) {
         boolean retval = false;
         GetMethod get = null;
         String baseUrlSt = client.getBaseUri().toString();
+        boolean previousFollowRedirects = client.isFollowRedirects();
         try {
             get = new GetMethod(baseUrlSt + AccountUtils.STATUS_PATH);
 
@@ -92,7 +93,7 @@ public class GetStatusRemoteOperation extends RemoteOperation {
         	String redirectedLocation = mLatestResult.getRedirectedLocation();
         	while (redirectedLocation != null && redirectedLocation.length() > 0
 							&& !mLatestResult.isSuccess()) {
-        		
+
         		isRedirectToNonSecureConnection |= (
         				baseUrlSt.startsWith(PROTOCOL_HTTPS) &&
         				redirectedLocation.startsWith(PROTOCOL_HTTP)
@@ -116,10 +117,10 @@ public class GetStatusRemoteOperation extends RemoteOperation {
                     if (json.has(NODE_EXTENDED_SUPPORT)) {
                         extendedSupport = json.getBoolean(NODE_EXTENDED_SUPPORT);
                     }
-                    
+
                     String version = json.getString(NODE_VERSION);
 					OwnCloudVersion ocVersion = new OwnCloudVersion(version);
-					
+
                     if (!ocVersion.isVersionValid()) {
                         mLatestResult = new RemoteOperationResult(RemoteOperationResult.ResultCode.BAD_OC_VERSION);
                     } else {
@@ -160,22 +161,23 @@ public class GetStatusRemoteOperation extends RemoteOperation {
 
         } catch (JSONException e) {
             mLatestResult = new RemoteOperationResult(RemoteOperationResult.ResultCode.INSTANCE_NOT_CONFIGURED);
-            
+
         } catch (Exception e) {
             mLatestResult = new RemoteOperationResult(e);
-            
+
         } finally {
             if (get != null)
                 get.releaseConnection();
+            client.setFollowRedirects(previousFollowRedirects);
         }
-        
+
         if (mLatestResult.isSuccess()) {
             Log_OC.i(TAG, "Connection check at " + baseUrlSt + ": " + mLatestResult.getLogMessage());
-            
+
         } else if (mLatestResult.getException() != null) {
-            Log_OC.e(TAG, "Connection check at " + baseUrlSt + ": " + mLatestResult.getLogMessage(), 
+            Log_OC.e(TAG, "Connection check at " + baseUrlSt + ": " + mLatestResult.getLogMessage(),
             		mLatestResult.getException());
-            
+
         } else {
             Log_OC.e(TAG, "Connection check at " + baseUrlSt + ": " + mLatestResult.getLogMessage());
         }
@@ -198,10 +200,10 @@ public class GetStatusRemoteOperation extends RemoteOperation {
         String baseUriStr = client.getBaseUri().toString();
         if (baseUriStr.startsWith(PROTOCOL_HTTP) || baseUriStr.startsWith(PROTOCOL_HTTPS)) {
             tryConnection(client);
-            
+
         } else {
             client.setBaseUri(Uri.parse(PROTOCOL_HTTPS + baseUriStr));
-            boolean httpsSuccess = tryConnection(client); 
+            boolean httpsSuccess = tryConnection(client);
 			if (!httpsSuccess && !mLatestResult.isSslRecoverableException()) {
                 Log_OC.d(TAG, "establishing secure connection failed, trying non secure connection");
                 client.setBaseUri(Uri.parse(PROTOCOL_HTTP + baseUriStr));
@@ -210,5 +212,5 @@ public class GetStatusRemoteOperation extends RemoteOperation {
         }
         return mLatestResult;
 	}
-	
+
 }

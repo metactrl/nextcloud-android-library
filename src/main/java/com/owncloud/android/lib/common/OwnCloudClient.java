@@ -1,23 +1,23 @@
 /* ownCloud Android Library is available under MIT license
  *   Copyright (C) 2015 ownCloud Inc.
  *   Copyright (C) 2012  Bartek Przybylski
- *   
+ *
  *   Permission is hereby granted, free of charge, to any person obtaining a copy
  *   of this software and associated documentation files (the "Software"), to deal
  *   in the Software without restriction, including without limitation the rights
  *   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  *   copies of the Software, and to permit persons to whom the Software is
  *   furnished to do so, subject to the following conditions:
- *   
+ *
  *   The above copyright notice and this permission notice shall be included in
  *   all copies or substantial portions of the Software.
- *   
- *   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, 
+ *
+ *   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
  *   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- *   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND 
- *   NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS 
- *   BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN 
- *   ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN 
+ *   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ *   NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ *   BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ *   ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
  *   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  *   THE SOFTWARE.
  *
@@ -55,20 +55,20 @@ import lombok.Getter;
 import lombok.Setter;
 
 public class OwnCloudClient extends HttpClient {
-	
+
     private static final String TAG = OwnCloudClient.class.getSimpleName();
     public static final int MAX_REDIRECTIONS_COUNT = 3;
     private static final String PARAM_SINGLE_COOKIE_HEADER = "http.protocol.single-cookie-header";
     private static final boolean PARAM_SINGLE_COOKIE_HEADER_VALUE = true;
     private static final String PARAM_PROTOCOL_VERSION = "http.protocol.version";
-    
+
     private static byte[] sExhaustBuffer = new byte[1024];
-    
+
     private static int sIntanceCounter = 0;
     @Getter @Setter private boolean followRedirects = true;
     @Getter private OwnCloudCredentials credentials = null;
     private int mInstanceNumber;
-    
+
     @Getter private Uri baseUri;
     @Setter private String userId;
 
@@ -77,31 +77,31 @@ public class OwnCloudClient extends HttpClient {
      */
     public OwnCloudClient(Uri baseUri, HttpConnectionManager connectionMgr) {
         super(connectionMgr);
-        
+
         if (baseUri == null) {
         	throw new IllegalArgumentException("Parameter 'baseUri' cannot be NULL");
         }
         this.baseUri = baseUri;
-        
+
         mInstanceNumber = sIntanceCounter++;
         Log_OC.d(TAG + " #" + mInstanceNumber, "Creating OwnCloudClient");
 
         String userAgent;
 
         userAgent = OwnCloudClientManagerFactory.getUserAgent();
-        
+
         getParams().setParameter(HttpMethodParams.USER_AGENT, userAgent);
         getParams().setParameter(PARAM_PROTOCOL_VERSION, HttpVersion.HTTP_1_1);
         getParams().setCookiePolicy(CookiePolicy.IGNORE_COOKIES);
         // to avoid problems with some web servers
-        getParams().setParameter(PARAM_SINGLE_COOKIE_HEADER, PARAM_SINGLE_COOKIE_HEADER_VALUE); 
-        
+        getParams().setParameter(PARAM_SINGLE_COOKIE_HEADER, PARAM_SINGLE_COOKIE_HEADER_VALUE);
+
         applyProxySettings();
-        
+
         clearCredentials();
     }
 
-    
+
     private void applyProxySettings() {
     	String proxyHost = System.getProperty("http.proxyHost");
     	String proxyPortSt = System.getProperty("http.proxyPort");
@@ -130,19 +130,19 @@ public class OwnCloudClient extends HttpClient {
     		clearCredentials();
     	}
     }
-    
+
     public void clearCredentials() {
 		if (!(credentials instanceof OwnCloudAnonymousCredentials)) {
 			credentials = OwnCloudCredentialsFactory.getAnonymousCredentials();
 		}
 		credentials.applyTo(this);
 	}
-    
+
     /**
      * Check if a file exists in the OC server
-     * 
+     *
      * @deprecated	Use ExistenceCheckOperation instead
-     * 
+     *
      * @return              	'true' if the file exists; 'false' it doesn't exist
      * @throws  	Exception   When the existence could not be determined
      */
@@ -155,20 +155,20 @@ public class OwnCloudClient extends HttpClient {
             		((status != HttpStatus.SC_OK)?"(FAIL)":""));
             exhaustResponse(head.getResponseBodyAsStream());
             return (status == HttpStatus.SC_OK);
-            
+
         } finally {
             head.releaseConnection();    // let the connection available for other methods
         }
     }
-    
+
     /**
      * Requests the received method with the received timeout (milliseconds).
-     * 
+     *
      * Executes the method through the inherited HttpClient.executedMethod(method).
-     * 
+     *
      * Sets the socket and connection timeouts only for the method received.
-     * 
-     * The timeouts are both in milliseconds; 0 means 'infinite'; 
+     *
+     * The timeouts are both in milliseconds; 0 means 'infinite';
      * < 0 means 'do not change the default'
      *
      * @param method                HTTP method request.
@@ -180,7 +180,7 @@ public class OwnCloudClient extends HttpClient {
         int oldSoTimeout = getParams().getSoTimeout();
         int oldConnectionTimeout = getHttpConnectionManager().getParams().getConnectionTimeout();
         try {
-            if (readTimeout >= 0) { 
+            if (readTimeout >= 0) {
                 method.getParams().setSoTimeout(readTimeout);   // this should be enough...
                 getParams().setSoTimeout(readTimeout);          // ... but HTTPS needs this
             }
@@ -240,17 +240,18 @@ public class OwnCloudClient extends HttpClient {
         int status = method.getStatusCode();
         RedirectionPath result = new RedirectionPath(status, MAX_REDIRECTIONS_COUNT);
         while (redirectionsCount < MAX_REDIRECTIONS_COUNT &&
-                (   status == HttpStatus.SC_MOVED_PERMANENTLY || 
+                (   status == HttpStatus.SC_MOVED_PERMANENTLY ||
                     status == HttpStatus.SC_MOVED_TEMPORARILY ||
-                    status == HttpStatus.SC_TEMPORARY_REDIRECT)
-                ) {
-            
+                    status == HttpStatus.SC_TEMPORARY_REDIRECT ||
+                    status == 308 // Permanent Redirect
+                )) {
+
             Header location = method.getResponseHeader("Location");
             if (location == null) {
             	location = method.getResponseHeader("location");
             }
             if (location != null) {
-                Log_OC.d(TAG + " #" + mInstanceNumber,  
+                Log_OC.d(TAG + " #" + mInstanceNumber,
                 		"Location to redirect: " + location.getValue());
 
                 String locationStr = location.getValue();
@@ -268,19 +269,25 @@ public class OwnCloudClient extends HttpClient {
                 }
                 if (destination != null) {
                     int suffixIndex = locationStr.lastIndexOf(AccountUtils.WEBDAV_PATH_4_0);
+                    if (suffixIndex < 0) {
+                        suffixIndex = locationStr.lastIndexOf(AccountUtils.WEBDAV_PATH_9_0);
+                    }
+                    if (suffixIndex < 0) {
+                        suffixIndex = locationStr.lastIndexOf(AccountUtils.DAV_UPLOAD);
+                    }
                     String redirectionBase = locationStr.substring(0, suffixIndex);
 
                     String destinationStr = destination.getValue();
                 	String destinationPath = destinationStr.substring(baseUri.toString().length());
                 	String redirectedDestination = redirectionBase + destinationPath;
-                	
+
                 	destination.setValue(redirectedDestination);
                     method.setRequestHeader(destination);
                 }
                 status = super.executeMethod(method);
                 result.addStatus(status);
                 redirectionsCount++;
-                
+
             } else {
                 Log_OC.d(TAG + " #" + mInstanceNumber,  "No location to redirect!");
                 status = HttpStatus.SC_NOT_FOUND;
@@ -291,7 +298,7 @@ public class OwnCloudClient extends HttpClient {
 
 	/**
      * Exhausts a not interesting HTTP response. Encouraged by HttpClient documentation.
-     * 
+     *
      * @param responseBodyAsStream      InputStream with the HTTP response to exhaust.
      */
     public void exhaustResponse(InputStream responseBodyAsStream) {
@@ -299,7 +306,7 @@ public class OwnCloudClient extends HttpClient {
             try {
                 while (responseBodyAsStream.read(sExhaustBuffer) >= 0);
                 responseBodyAsStream.close();
-            
+
             } catch (IOException io) {
                 Log_OC.e(TAG, "Unexpected exception while exhausting not interesting HTTP response;" +
                 		" will be IGNORED", io);
@@ -308,11 +315,11 @@ public class OwnCloudClient extends HttpClient {
     }
 
     /**
-     * Sets the connection and wait-for-data timeouts to be applied by default to the methods 
+     * Sets the connection and wait-for-data timeouts to be applied by default to the methods
      * performed by this client.
      */
     public void setDefaultTimeouts(int defaultDataTimeout, int defaultConnectionTimeout) {
-    	if (defaultDataTimeout >= 0) { 
+    	if (defaultDataTimeout >= 0) {
     		getParams().setSoTimeout(defaultDataTimeout);
     	}
     	if (defaultConnectionTimeout >= 0) {
@@ -331,12 +338,12 @@ public class OwnCloudClient extends HttpClient {
     public Uri getNewWebdavUri() {
         return Uri.parse(baseUri + AccountUtils.WEBDAV_PATH_9_0);
     }
-    
+
     /**
-     * Sets the root URI to the ownCloud server.   
+     * Sets the root URI to the ownCloud server.
      *
-     * Use with care. 
-     * 
+     * Use with care.
+     *
      * @param uri
      */
     public void setBaseUri(Uri uri) {
@@ -388,9 +395,9 @@ public class OwnCloudClient extends HttpClient {
         if (counter == 0) {
     		Log_OC.d(TAG + " #" + mInstanceNumber, "No set-cookie");
         }
-        
+
 	}
-	
+
 	public String getCookiesString() {
 		Cookie[] cookies = getState().getCookies();
 		String cookiesString = "";
@@ -407,18 +414,18 @@ public class OwnCloudClient extends HttpClient {
 	public int getConnectionTimeout() {
         return getHttpConnectionManager().getParams().getConnectionTimeout();
 	}
-	
+
 	public int getDataTimeout() {
 		return getParams().getSoTimeout();
 	}
-	
+
 	private void logCookie(Cookie cookie) {
     	Log_OC.d(TAG, "Cookie name: "+ cookie.getName() );
     	Log_OC.d(TAG, "       value: "+ cookie.getValue() );
     	Log_OC.d(TAG, "       domain: "+ cookie.getDomain());
     	Log_OC.d(TAG, "       path: "+ cookie.getPath() );
     	Log_OC.d(TAG, "       version: "+ cookie.getVersion() );
-    	Log_OC.d(TAG, "       expiryDate: " + 
+    	Log_OC.d(TAG, "       expiryDate: " +
     			(cookie.getExpiryDate() != null ? cookie.getExpiryDate().toString() : "--"));
     	Log_OC.d(TAG, "       comment: "+ cookie.getComment() );
     	Log_OC.d(TAG, "       secure: "+ cookie.getSecure() );
