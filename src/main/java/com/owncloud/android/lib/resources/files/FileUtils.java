@@ -67,4 +67,19 @@ public class FileUtils {
 
         return md5String.toString();
     }
+
+    public static String uniqueDigest(String path, long lastModified, long length) throws NoSuchAlgorithmException {
+        String temp = path + lastModified + length;
+
+        MessageDigest messageDigest = MessageDigest.getInstance("MD5");
+        messageDigest.update(temp.getBytes());
+        byte[] digest = messageDigest.digest();
+        StringBuilder md5String = new StringBuilder(new BigInteger(1, digest).toString(16));
+
+        while (md5String.length() < 32) {
+            md5String.insert(0, "0");
+        }
+
+        return md5String.toString();
+    }
 }
