@@ -70,7 +70,7 @@ public class ChunkedFileUploadRemoteOperation extends UploadFileRemoteOperation 
     @Override
     protected RemoteOperationResult run(OwnCloudClient client) {
         RemoteOperationResult result;
-        DefaultHttpMethodRetryHandler oldRetryHandler = (DefaultHttpMethodRetryHandler) 
+        DefaultHttpMethodRetryHandler oldRetryHandler = (DefaultHttpMethodRetryHandler)
                 client.getParams().getParameter(HttpMethodParams.RETRY_HANDLER);
         File file = new File(localPath);
 
@@ -85,18 +85,18 @@ public class ChunkedFileUploadRemoteOperation extends UploadFileRemoteOperation 
             MkColMethod createFolder = new MkColMethod(uploadFolderUri);
 
             client.executeMethod(createFolder, 30000, 5000);
-            
+
             // list chunks
             PropFindMethod listChunks = new PropFindMethod(uploadFolderUri,
                     WebdavUtils.getChunksPropSet(),
                                                            DavConstants.DEPTH_1);
 
             client.executeMethod(listChunks);
-            
+
             if (!listChunks.succeeded()) {
                 return new RemoteOperationResult(listChunks.succeeded(), listChunks);
             }
-            
+
             List<Chunk> chunksOnServer = new ArrayList<>();
 
             MultiStatus dataInServer = listChunks.getResponseBodyAsMultiStatus();
@@ -125,7 +125,7 @@ public class ChunkedFileUploadRemoteOperation extends UploadFileRemoteOperation 
             // upload chunks
             for (Chunk missingChunk : missingChunks) {
                 RemoteOperationResult chunkResult = uploadChunk(client, uploadFolderUri, missingChunk);
-                
+
                 if (!chunkResult.isSuccess()) {
                     return chunkResult;
                 }
@@ -139,7 +139,7 @@ public class ChunkedFileUploadRemoteOperation extends UploadFileRemoteOperation 
             String destinationUri = client.getNewWebdavUri() + "/files/" + client.getUserId() +
                     WebdavUtils.encodePath(remotePath);
             String originUri = uploadFolderUri + "/.file";
-            MoveMethod moveMethod = new MoveMethod(originUri, destinationUri, true);
+            MoveMethod moveMethod = new MyMoveMethod(originUri, destinationUri, true);
             moveMethod.addRequestHeader(OC_CHUNK_X_OC_MTIME_HEADER, String.valueOf(file.lastModified() / 1000));
             int moveResult = client.executeMethod(moveMethod);
 
@@ -217,7 +217,7 @@ public class ChunkedFileUploadRemoteOperation extends UploadFileRemoteOperation 
             raf = new RandomAccessFile(file, "r");
             channel = raf.getChannel();
             entity = new ChunkFromFileChannelRequestEntity(channel, mimeType, chunk.start, chunk.length(), file);
-            
+
             synchronized (dataTransferListeners) {
                 ((ProgressiveDataTransfer) entity).addDataTransferProgressListeners(dataTransferListeners);
             }
